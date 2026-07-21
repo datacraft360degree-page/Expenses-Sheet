@@ -195,7 +195,7 @@
                 <span id="total-expenses">0.00</span>
             </div>
             <div class="summary-row">
-                <span>Total Due:</span>
+                <span>Current Balance:</span>
                 <span id="total-due">10000.00</span>
             </div>
         </div>
@@ -363,7 +363,7 @@
         message += `--------------------------------\n`;
         message += `Opening Bal: Rs ${openBal}\n`;
         message += `Total Exp: Rs ${totExp}\n`;
-        message += `Total Due: Rs ${totDue}\n`;
+        message += `Current Balance: Rs ${totDue}\n`;
         message += `--------------------------------\n\n`;
         message += `*TRANSACTION DETAILS:*\n`;
 
