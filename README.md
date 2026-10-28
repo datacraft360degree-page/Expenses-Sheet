@@ -162,11 +162,41 @@
         .cr-text { color: #38a169; font-weight: bold; }
         .dr-text { color: #e53e3e; font-weight: bold; }
 
+        /* Toast Container & Notification Styles */
+        #toast-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .toast {
+            min-width: 250px;
+            padding: 12px 20px;
+            border-radius: 6px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .toast-info { background-color: #3182ce; }
+        .toast-success { background-color: #38a169; }
+        .toast-error { background-color: #e53e3e; }
+
         /* Print Specific Styling */
         @media print {
             body { background: white; padding: 0; }
             .container { box-shadow: none; padding: 0; max-width: 100%; }
-            .action-bar, .btn-add, .delete-col, .whatsapp-group { display: none !important; }
+            .action-bar, .btn-add, .delete-col, .whatsapp-group, #toast-container { display: none !important; }
             input, select {
                 border: none !important;
                 background: transparent !important;
@@ -231,6 +261,9 @@
     </table>
 </div>
 
+<!-- Toast Container -->
+<div id="toast-container"></div>
+
 <script>
     document.getElementById('current-date').innerText = new Date().toISOString().split('T')[0];
 
@@ -245,12 +278,33 @@
 
     let tableData = initialData;
 
+    // Helper function to display Popup Toast Notifications
+    function showToast(message, type = 'info', duration = 3000) {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.innerText = message;
+        
+        container.appendChild(toast);
+
+        // Trigger animation
+        setTimeout(() => toast.classList.add('show'), 10);
+
+        // Remove toast after duration
+        setTimeout(() => {
+            toast.classList.remove('show');
+            toast.addEventListener('transitionend', () => toast.remove());
+        }, duration);
+    }
+
     // Fetch data from Google Sheet automatically on page load
     function loadDataFromSheet() {
         if (WEB_APP_URL === "YOUR_DEPLOYED_WEB_APP_URL_HERE") {
             renderTable();
             return;
         }
+
+        showToast("Fetching data from Cloud Storage...", "info");
 
         fetch(WEB_APP_URL)
             .then(response => response.json())
@@ -265,10 +319,12 @@
                     document.getElementById('target-phone').value = data.targetPhone;
                 }
                 renderTable();
+                showToast("Data loaded from Cloud Storage successfully!", "success");
             })
             .catch(error => {
-                console.error('Error fetching from Google Sheets:', error);
+                console.error('Error fetching from Cloud Storage:', error);
                 renderTable();
+                showToast("Failed to fetch data from Cloud Storage.", "error");
             });
     }
 
@@ -371,6 +427,7 @@
 
         const saveBtn = document.querySelector('.btn-save');
         saveBtn.innerText = "Saving...";
+        showToast("Saving data to Cloud Storage...", "info");
 
         fetch(WEB_APP_URL, {
             method: 'POST',
@@ -379,12 +436,12 @@
         .then(response => response.json())
         .then(data => {
             saveBtn.innerText = "Save Changes";
-            alert('Synced and saved to Google Sheets successfully!');
+            showToast("Synced and saved to Cloud Storage successfully!", "success");
         })
         .catch(error => {
             saveBtn.innerText = "Save Changes";
             console.error('Error saving to Google Sheets:', error);
-            alert('Failed to sync with Google Sheets.');
+            showToast("Failed to sync with Google Sheet.", "error");
         });
     }
 
