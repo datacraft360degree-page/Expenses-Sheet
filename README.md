@@ -234,19 +234,43 @@
 <script>
     document.getElementById('current-date').innerText = new Date().toISOString().split('T')[0];
 
+    // PASTE YOUR DEPLOYED GOOGLE APPS SCRIPT WEB APP URL HERE:
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwWBW6uY3TF-gM0mj0MqByV0RdwkfNLxnOSiv74S3fIBA_Z-r7_N_glLxK6kxjaFkaM0w/exec";
+
     let initialData = [
         { name: "Kapil", date: "2026-07-15", particular: "Medicine", type: "Debit", amount: 400 },
         { name: "Kapil", date: "2026-07-15", particular: "Phone Recharge", type: "Credit", amount: 300 },
         { name: "Kapil", date: "2026-07-15", particular: "Doctors bill", type: "Select any", amount: "" }
     ];
 
-    let savedData = localStorage.getItem('expense_data');
-    let savedBalance = localStorage.getItem('opening_balance');
-    let savedPhone = localStorage.getItem('target_phone');
-    
-    let tableData = savedData ? JSON.parse(savedData) : initialData;
-    if (savedBalance) document.getElementById('opening-balance').value = savedBalance;
-    if (savedPhone) document.getElementById('target-phone').value = savedPhone;
+    let tableData = initialData;
+
+    // Fetch data from Google Sheet automatically on page load
+    function loadDataFromSheet() {
+        if (WEB_APP_URL === "YOUR_DEPLOYED_WEB_APP_URL_HERE") {
+            renderTable();
+            return;
+        }
+
+        fetch(WEB_APP_URL)
+            .then(response => response.json())
+            .then(data => {
+                if (data.tableData && data.tableData.length > 0) {
+                    tableData = data.tableData;
+                }
+                if (data.openingBalance !== undefined) {
+                    document.getElementById('opening-balance').value = data.openingBalance;
+                }
+                if (data.targetPhone) {
+                    document.getElementById('target-phone').value = data.targetPhone;
+                }
+                renderTable();
+            })
+            .catch(error => {
+                console.error('Error fetching from Google Sheets:', error);
+                renderTable();
+            });
+    }
 
     function renderTable() {
         const tbody = document.getElementById('table-body');
@@ -256,9 +280,9 @@
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td class="read-only-cell">${index + 1}</td>
-                <td><input type="text" value="${row.name}" oninput="updateData(${index}, 'name', this.value)"></td>
-                <td><input type="date" value="${row.date}" oninput="updateData(${index}, 'date', this.value)"></td>
-                <td><input type="text" value="${row.particular}" oninput="updateData(${index}, 'particular', this.value)"></td>
+                <td><input type="text" value="${row.name || ''}" oninput="updateData(${index}, 'name', this.value)"></td>
+                <td><input type="date" value="${row.date || ''}" oninput="updateData(${index}, 'date', this.value)"></td>
+                <td><input type="text" value="${row.particular || ''}" oninput="updateData(${index}, 'particular', this.value)"></td>
                 <td>
                     <select onchange="updateData(${index}, 'type', this.value); calculateSheet();">
                         <option value="Select any" ${row.type === 'Select any' ? 'selected' : ''}>Select any</option>
@@ -266,7 +290,7 @@
                         <option value="Credit" ${row.type === 'Credit' ? 'selected' : ''}>Credit</option>
                     </select>
                 </td>
-                <td><input type="number" value="${row.amount}" oninput="updateData(${index}, 'amount', this.value); calculateSheet();"></td>
+                <td><input type="number" value="${row.amount || ''}" oninput="updateData(${index}, 'amount', this.value); calculateSheet();"></td>
                 <td class="read-only-cell math-deposit" id="deposit-${index}"></td>
                 <td class="read-only-cell math-crdr" id="crdr-${index}"></td>
                 <td class="delete-col"><button onclick="deleteRow(${index})" style="background:none; border:none; color:#e53e3e; cursor:pointer; font-weight:bold;">✕</button></td>
@@ -334,16 +358,38 @@
     }
 
     function saveData() {
-        localStorage.setItem('expense_data', JSON.stringify(tableData));
-        localStorage.setItem('opening_balance', document.getElementById('opening-balance').value);
-        localStorage.setItem('target_phone', document.getElementById('target-phone').value);
-        alert('All changes saved successfully!');
+        if (WEB_APP_URL === "YOUR_DEPLOYED_WEB_APP_URL_HERE") {
+            alert("Please configure your Google Apps Script Web App URL first!");
+            return;
+        }
+
+        const payload = {
+            openingBalance: document.getElementById('opening-balance').value,
+            targetPhone: document.getElementById('target-phone').value,
+            tableData: tableData
+        };
+
+        const saveBtn = document.querySelector('.btn-save');
+        saveBtn.innerText = "Saving...";
+
+        fetch(WEB_APP_URL, {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        })
+        .then(response => response.json())
+        .then(data => {
+            saveBtn.innerText = "Save Changes";
+            alert('Synced and saved to Google Sheets successfully!');
+        })
+        .catch(error => {
+            saveBtn.innerText = "Save Changes";
+            console.error('Error saving to Google Sheets:', error);
+            alert('Failed to sync with Google Sheets.');
+        });
     }
 
     function sendWhatsApp() {
-        localStorage.setItem('expense_data', JSON.stringify(tableData));
-        localStorage.setItem('opening_balance', document.getElementById('opening-balance').value);
-        localStorage.setItem('target_phone', document.getElementById('target-phone').value);
+        saveData(); // Automatically syncs data when sending
 
         const openBal = document.getElementById('opening-balance').value;
         const totExp = document.getElementById('total-expenses').innerText;
@@ -358,7 +404,6 @@
             return;
         }
 
-        // Exact header layout request
         let message = `*EXPENSE REPORT - ${todayStr}*\n`;
         message += `--------------------------------\n`;
         message += `Opening Bal: Rs ${openBal}\n`;
@@ -367,13 +412,11 @@
         message += `--------------------------------\n\n`;
         message += `*TRANSACTION DETAILS:*\n`;
 
-        // Fixed-width text padding function to hold grid shape perfectly inside mobile/PC viewports
         const pad = (text, length) => {
             let str = String(text || '-');
             return str.padEnd(length, ' ').substring(0, length);
         };
 
-        // Monospace block creates the clean Excel structure directly beneath the text headers
         message += `\`\`\`\n`;
         message += `${pad("SN", 2)}| ${pad("Name", 6)}| ${pad("Particulars", 11)}| ${pad("Amt", 5)}| ${pad("Type", 2)}\n`;
         message += `--|-------|------------|-----|--\n`;
@@ -397,7 +440,8 @@
         window.open(url, '_blank');
     }
 
-    renderTable();
+    // Initialize data load from Google Sheets automatically
+    loadDataFromSheet();
 </script>
 
 </body>
